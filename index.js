@@ -5,6 +5,9 @@ import { createClient } from 'redis'
 
 const app = express();
 
+app.use(express.json());
+
+
 const client = await createClient()
     .on('error', (err) => console.log('Redis Client Error', err)).connect();
 
@@ -43,6 +46,30 @@ app.get('/api/products', async (req, res) => {
 
     return res.json({ "The Products are: ": products })
 });
+
+app.put('/api/products/:id', async (req, res) => {
+    const productId = req.params.id;
+    const updateData = req.body;
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+        productId,
+        { $set: updateData },
+        { new: true }
+    );
+
+    const listCacheKey = 'api:products*';
+    const keys = await client.keys(listCacheKey);
+    if (keys.length > 0) {
+        await client.del(keys)
+    }
+
+
+    res.json({
+        success: true,
+        message: 'Product Updated',
+        updatedProduct: updatedProduct
+    })
+})
 
 function generateCacheKey(req) {
     const baseUrl = req.path.replace(/^\/+|\/+$/g, '').replace(/\//g, ':');
